@@ -23,12 +23,12 @@ Les informations affichées :
 - informations météorologiques détaillées,
 - pluviométrie dans l'heure (prévisions à 5 puis 10 minutes),
 - alertes météos en cours (inondations, vents violents, etc) en rapport à votre département,
-- prévisions météo quotidienne de 1 à 15 jours maximum (réglable) ou des prévisions horaires de 1 à x heures (réglable),
+- prévisions météo quotidiennes de 1 à 15 jours maximum (réglable) et des prévisions horaires de 1 à x heures (réglable),
 - sélection des informations à afficher pour personnaliser votre carte.
 
 Un exemple de rendu :
 
-![Weather Card](https://github.com/hacf-fr/lovelace-meteofrance-weather-card/blob/Meteo-France/meteofrance-weather-card.png)
+![Weather Card](meteofrance-weather-card.png)
 
 ## Installation
 
@@ -40,7 +40,10 @@ Cette carte est prévue pour utiliser les entités de l'intégration [Météo Fr
 
 #### Installation de la carte
 
-1. Depuis [HACS](https://hacs.xyz/) (Home Assistant Community Store), sléectionner `Frontend`. Puis ouvrez le menu en haut à droite et utiliser l'option `Dépôts personnalisés` pour ajouter le dépôt de la carte.
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=hacf-fr&repository=lovelace-meteofrance-weather-card&category=lovelace)
+Si le lien a fonctionné, passez directement à l'étape 3. Sinon, procédez comme suit :
+
+1. Depuis [HACS](https://hacs.xyz/) (Home Assistant Community Store), sélectionner `Frontend`. Puis ouvrez le menu en haut à droite et utiliser l'option `Dépôts personnalisés` pour ajouter le dépôt de la carte.
 
 2. Ajoutez l'adresse <https://github.com/hacf-fr/lovelace-meteofrance-weather-card> avec pour catégorie `Lovelace`, et faire `AJOUTER`. Le dépôt de la carte apparaît dans la liste.
 
@@ -56,21 +59,17 @@ Vous trouverez la carte dans la liste des cartes personnalisées (en fin de list
 
 Une fois choisi, sa configuration est la suivante :
 
-1. **Définir un nom** pour la carte (généralement la ville, comme pour l'intégration).
+1. **Sélectionner l'entité météo** que vous avez défini avec l'intégration (par défaut la carte en choisit une mais ce n'est pas forcément l'entité météo france que vous avez configuré).
 
-2. **Sélectionner l'entité météo** que vous avez définit avec l'intégration (par défaut la carte en choisit une mais ce n'est pas forcément l'entité météo france que vous avez configuré).
+2. Toutes les autres entités **sont automatiquement définies** mais vous pouvez les redéfinir ou les supprimer à votre guise.
 
-3. Toutes les autres entités **sont automatiquement définies** mais vous pouvez les redéfinir ou les supprimer à votre guise.
+3. **Sélectionner les éléments** de la carte **à afficher** (vous pouvez ainsi avoir plusieurs cartes avec des affichages différents).
 
-4. Seule l'entité pour **les alertes est à préciser manuellement**.
+4. **Préciser les nombres d'heures et de jours de prévision** à afficher.
 
-5. **Sélectionner les parties** de la carte **à afficher** (vous pouvez ainsi avoir plusieurs cartes avec des affichages différents).
+5. `Enregistrer` votre configuration.
 
-6. **Préciser le nombre de jours de prévision** à afficher en bas de carte, maximum 5.
-
-7. `Enregistrer` votre configuration.
-
-![Weather Card Configuration](https://github.com/hacf-fr/lovelace-meteofrance-weather-card/blob/Meteo-France/meteofrance-weather-card-editor.png)
+![Weather Card Configuration](meteofrance-weather-card-editor.png)
 
 ### Installation manuelle (utilisateurs avancés)
 
@@ -114,23 +113,32 @@ Ci-dessous les éléments de configuration avec pour exemple l'usage d'une inté
 view:
     cards:
     - type: "custom:meteofrance-weather-card"
-        name: Nantes # nom de la carte, peut être différent du nom de l'intégration
-        entity: weather.nantes # Entité météo principale
-        # Les entités annexes de météo france
-        cloudCoverEntity: sensor.nantes_cloud_cover
-        rainChanceEntity: sensor.nantes_rain_chance
-        freezeChanceEntity: sensor.nantes_freeze_chance
-        snowChanceEntity: sensor.nantes_snow_chance
-        uvEntity: sensor.nantes_uv
-        rainForecastEntity: sensor.nantes_next_rain
-        alertEntity: sensor.44_weather_alert
-        number_of_forecasts: "5"
-        # Les switches pour afficher ou non les différentes zones.
-        current: true
-        details: true
-        one_hour_forecast: true
-        alert_forecast: true
-        forecast: true
+      entity: weather.nantes # Entité météo principale
+      name: Nantes # nom de la carte, peut être différent du nom de l'intégration
+      # Les switches pour afficher ou non les différentes zones.
+      current: true
+      details: true
+      alert_forecast: true
+      one_hour_forecast: true
+      daily_forecast: true
+      hourly_forecast: true
+      humidity_forecast: true
+      wind_forecast_icons: true
+      animated_icons: true
+      # Les curseurs
+      number_of_hourly_forecasts: "5"
+      number_of_daily_forecasts: "5"
+      # Les entités annexes de météo france
+      detailEntity: sensor.nantes_daily_precipitation
+      cloudCoverEntity: sensor.nantes_cloud_cover
+      rainChanceEntity: sensor.nantes_rain_chance
+      freezeChanceEntity: sensor.nantes_freeze_chance
+      snowChanceEntity: sensor.nantes_snow_chance
+      uvEntity: sensor.nantes_uv
+      rainForecastEntity: sensor.nantes_next_rain
+      alertEntity: sensor.44_weather_alert
+      # Chemin
+      icons: /local/community/lovelace-meteofrance-weather-card/icons/
 ```
 
 #### options avancées via YAML

@@ -24,6 +24,7 @@ const weatherIconsDay = {
 };
 
 const DefaultSensors = [
+  ["detailEntity", "_rain_chance"],
   ["cloudCoverEntity", "_cloud_cover"],
   ["rainChanceEntity", "_rain_chance"],
   ["freezeChanceEntity", "_freeze_chance"],
@@ -140,6 +141,8 @@ class MeteofranceWeatherCard extends LitElement {
   static get properties() {
     return {
       _config: {},
+      _dailyForecastEvent: {},
+      _hourlyForecastEvent: {},
       hass: {},
     };
   }
@@ -192,11 +195,47 @@ class MeteofranceWeatherCard extends LitElement {
     return entities;
   }
 
+  isDailyForecast(forecast) {
+    const diff =
+      new Date(forecast[1].datetime) - new Date(forecast[0].datetime);
+    return diff > 3600000;
+  }
+
+  // Upgrade config fields if necessary
+  upgradeConfig(config) {
+    const upgradedConfig = { ...config };
+    if (this.hass !== undefined) {
+      const stateObj = this.hass.states[this._config.entity];
+      if (stateObj !== undefined && stateObj.attributes.forecast !== undefined) {
+        // Deduce "daily_forecast" & "hourly_forecast" from deprecated "forecast"
+        if (this.isDailyForecast(stateObj.attributes.forecast)) {
+          if (config["forecast"] !== undefined && config["daily_forecast"] === undefined) {
+            upgradedConfig["daily_forecast"] = config["forecast"];
+            upgradedConfig["hourly_forecast"] = "false";
+          }
+          if (config["number_of_forecasts"] !== undefined && config["number_of_daily_forecasts"] === undefined) {
+            upgradedConfig["number_of_daily_forecasts"] = config["number_of_forecasts"];
+          }
+        }
+        else {
+          if (config["forecast"] !== undefined && config["hourly_forecast"] === undefined) {
+            upgradedConfig["daily_forecast"] = "false";
+            upgradedConfig["hourly_forecast"] = config["forecast"];
+          }
+          if (config["number_of_forecasts"] !== undefined && config["number_of_hourly_forecasts"] === undefined) {
+            upgradedConfig["number_of_hourly_forecasts"] = config["number_of_forecasts"];
+          }
+        }
+      }
+    }
+    return upgradedConfig;
+  }
+
   setConfig(config) {
     if (!config.entity) {
       throw new Error("Please define a weather entity");
     }
-    this._config = config;
+    this._config = this.upgradeConfig(config);
   }
 
   shouldUpdate(changedProps) {
@@ -205,6 +244,92 @@ class MeteofranceWeatherCard extends LitElement {
 
   isSelected(option) {
     return option === undefined || option === true;
+  }
+
+  _unsubscribeDailyForecastEvents() {
+    if (this._daily_subscribed) {
+      this._daily_subscribed.then((unsub) => unsub());
+      this._daily_subscribed = undefined;
+    }
+  }
+
+  _unsubscribeHourlyForecastEvents() {
+    if (this._hourly_subscribed) {
+      this._hourly_subscribed.then((unsub) => unsub());
+      this._hourly_subscribed = undefined;
+    }
+  }
+
+  async _subscribeDailyForecastEvents() {
+    this._unsubscribeDailyForecastEvents();
+    if (
+      !this.isConnected ||
+      !this.hass ||
+      !this._config ||
+      !this.isSelected(this._config.daily_forecast)
+    ) {
+      return;
+    }
+
+    this._daily_subscribed = this.hass.connection.subscribeMessage(
+      (event) => {
+        this._dailyForecastEvent = event;
+      },
+      {
+        type: "weather/subscribe_forecast",
+        forecast_type: "daily",
+        entity_id: this._config.entity,
+      }
+    );
+  }
+
+  async _subscribeHourlyForecastEvents() {
+    this._unsubscribeHourlyForecastEvents();
+    if (
+      !this.isConnected ||
+      !this.hass ||
+      !this._config ||
+      !this.isSelected(this._config.hourly_forecast)
+    ) {
+      return;
+    }
+
+    this._hourly_subscribed = this.hass.connection.subscribeMessage(
+      (event) => {
+        this._hourlyForecastEvent = event;
+      },
+      {
+        type: "weather/subscribe_forecast",
+        forecast_type: "hourly",
+        entity_id: this._config.entity,
+      }
+    );
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (this.hasUpdated && this._config && this.hass) {
+      this._subscribeDailyForecastEvents();
+      this._subscribeHourlyForecastEvents();
+    }
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._unsubscribeDailyForecastEvents();
+    this._unsubscribeHourlyForecastEvents();
+  }
+
+  updated(changedProps) {
+    if (!this.hass || !this._config) {
+      return;
+    }
+    if (changedProps.has("_config") || !this._daily_subscribed) {
+      this._subscribeDailyForecastEvents();
+    }
+    if (changedProps.has("_config") || !this._hourly_subscribed) {
+      this._subscribeHourlyForecastEvents();
+    }
   }
 
   render() {
@@ -247,8 +372,11 @@ class MeteofranceWeatherCard extends LitElement {
         ${this.isSelected(this._config.one_hour_forecast)
           ? this.renderOneHourForecast()
           : ""}
-        ${this.isSelected(this._config.forecast)
-          ? this.renderForecast(stateObj.attributes.forecast)
+        ${this.isSelected(this._config.hourly_forecast)
+          ? this.renderForecast(this._hourlyForecastEvent, this._config.number_of_hourly_forecasts)
+          : ""}
+        ${this.isSelected(this._config.daily_forecast)
+          ? this.renderForecast(this._dailyForecastEvent, this._config.number_of_daily_forecasts)
           : ""}
       </ha-card>
     `;
@@ -266,7 +394,7 @@ class MeteofranceWeatherCard extends LitElement {
         ></li>
         <li>
           ${this.getPhenomenaText(stateObj.state, this.isNightTime())}
-          ${this._config.name ? html` <div>${this._config.name}</div>` : ""}
+          <div>${this._config.name !== undefined ? this._config.name : ""}</div>
         </li>
         <li>
           ${this.getUnit("temperature") == "°F"
@@ -450,27 +578,27 @@ class MeteofranceWeatherCard extends LitElement {
     </div>`;
   }
 
-  renderForecast(forecast) {
-    if (!forecast || forecast.length === 0) {
+  renderForecast(forecast, number_of_forecasts) {
+    if (!forecast || !forecast.forecast || forecast.forecast.length === 0) {
       return html``;
     }
 
     const lang = this.hass.selectedLanguage || this.hass.language;
-    const isDaily = this.isDailyForecast(forecast);
+    const isDaily = forecast.type === "daily" ;
 
     this.numberElements++;
-    return html` <ul
+    return html`  <div style="overflow-x:auto;"> <ul
       class="flow-row forecast ${this.numberElements > 1 ? " spacer" : ""}"
     >
-      ${forecast
+      ${forecast.forecast
         .slice(
           0,
-          this._config.number_of_forecasts
-            ? this._config.number_of_forecasts
+          number_of_forecasts
+            ? number_of_forecasts
             : 5
         )
         .map((daily) => this.renderDailyForecast(daily, lang, isDaily))}
-    </ul>`;
+    </ul></div>`;
   }
 
   renderDailyForecast(daily, lang, isDaily) {
@@ -480,6 +608,17 @@ class MeteofranceWeatherCard extends LitElement {
           ${isDaily
             ? new Date(daily.datetime).toLocaleDateString(lang, {
                 weekday: "short",
+              })
+            : new Date(daily.datetime).toLocaleDateString(lang, {
+                weekday: "short",
+                day: "numeric",
+              })}
+        </li>
+        <li>
+          ${isDaily
+            ? new Date(daily.datetime).toLocaleDateString(lang, {
+                day: "numeric",
+                month: "short",
               })
             : new Date(daily.datetime).toLocaleTimeString(lang, {
                 hour: "2-digit",
@@ -513,7 +652,7 @@ class MeteofranceWeatherCard extends LitElement {
               </li>
             `
           : ""}
-        ${this._config.humidity_forecast &&
+        ${this.isSelected(this._config.humidity_forecast) &&
         daily.humidity !== undefined &&
         daily.humidity !== null
           ? html`
@@ -540,14 +679,14 @@ class MeteofranceWeatherCard extends LitElement {
               </li>
             `
           : ""}
-        ${this._config.wind_forecast_icons && daily.wind_bearing !== undefined && daily.wind_bearing !== null
+        ${this.isSelected(this._config.wind_forecast_icons) && daily.wind_bearing !== undefined && daily.wind_bearing !== null
           ? html`			
 			<li class="icon"
 				style="background: none, url('/local/community/lovelace-meteofrance-weather-card/icons/arrow-north-static.svg'); background-size: contain; transform: rotate(${daily.wind_bearing + 180}deg) scale(0.5)">
 			  </li>
 			  `
            : ""}
-	 ${this._config.wind_forecast_icons && daily.wind_bearing !== undefined && daily.wind_bearing == null
+	 ${this.isSelected(this._config.wind_forecast_icons) && daily.wind_bearing !== undefined && daily.wind_bearing == null
           ? html`			
 			<li class="icon"
 				style="background: none, url('/local/community/lovelace-meteofrance-weather-card/icons/no-wind-bearing-static.svg'); background-size: contain; transform:  scale(0.5)">
@@ -556,12 +695,6 @@ class MeteofranceWeatherCard extends LitElement {
            : ""}
       </ul>
     </li>`;
-  }
-
-  isDailyForecast(forecast) {
-    const diff =
-      new Date(forecast[1].datetime) - new Date(forecast[0].datetime);
-    return diff > 3600000;
   }
 
   isNightTime(datetimehourly) {
@@ -979,6 +1112,7 @@ class MeteofranceWeatherCard extends LitElement {
 
       .forecast ul.day {
         align-items: center;
+        width: 8ch;
       }
 
       .forecast ul.day > *:first-child {

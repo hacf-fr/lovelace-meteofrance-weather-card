@@ -420,6 +420,7 @@ class MeteofranceWeatherCard extends LitElement {
       next_rising = new Date(sun.attributes.next_rising);
       next_setting = new Date(sun.attributes.next_setting);
     }
+    const hour12 = this.hass.locale.time_format == "12" ? true : this.hass.locale.time_format == "24" ? false : undefined;
 
     this.numberElements++;
 
@@ -473,7 +474,9 @@ class MeteofranceWeatherCard extends LitElement {
         <!-- Sunset up -->
         ${next_rising
           ? this.renderDetail(
-              next_rising.toLocaleTimeString(),
+              next_setting.toLocaleTimeString([], {
+                hour12: hour12,
+              }),
               "Heure de lever",
               "mdi:weather-sunset-up"
             )
@@ -481,7 +484,9 @@ class MeteofranceWeatherCard extends LitElement {
         <!-- Sunset down -->
         ${next_setting
           ? this.renderDetail(
-              next_setting.toLocaleTimeString(),
+              next_setting.toLocaleTimeString([], {
+                hour12: hour12,
+              }),
               "Heure de coucher",
               "mdi:weather-sunset-down"
             )
@@ -585,6 +590,7 @@ class MeteofranceWeatherCard extends LitElement {
 
     const lang = this.hass.selectedLanguage || this.hass.language;
     const isDaily = forecast.type === "daily" ;
+    const hour12 = this.hass.locale.time_format == "12" ? true : this.hass.locale.time_format == "24" ? false : undefined;
 
     this.numberElements++;
     return html`  <div style="overflow-x:auto;"> <ul
@@ -597,11 +603,11 @@ class MeteofranceWeatherCard extends LitElement {
             ? number_of_forecasts
             : 5
         )
-        .map((daily) => this.renderDailyForecast(daily, lang, isDaily))}
+        .map((daily) => this.renderDailyForecast(daily, lang, isDaily, hour12))}
     </ul></div>`;
   }
 
-  renderDailyForecast(daily, lang, isDaily) {
+  renderDailyForecast(daily, lang, isDaily, hour12) {
     return html` <li>
       <ul class="flow-column day">
         <li>
@@ -623,6 +629,7 @@ class MeteofranceWeatherCard extends LitElement {
             : new Date(daily.datetime).toLocaleTimeString(lang, {
                 hour: "2-digit",
                 minute: "2-digit",
+                hour12: hour12,
               })}
         </li>
         <li
@@ -734,14 +741,17 @@ class MeteofranceWeatherCard extends LitElement {
     let rainForecastTimeRef = new Date(
       rainForecastEntity.attributes["forecast_time_ref"]
     );
+    const hour12 = this.hass.locale.time_format == "12" ? true : this.hass.locale.time_format == "24" ? false : undefined;
     let rainForecastStartTime = rainForecastTimeRef.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
+      hour12: hour12,
     });
     rainForecastTimeRef.setHours(rainForecastTimeRef.getHours() + 1);
     let rainForecastEndTime = rainForecastTimeRef.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
+      hour12: hour12,
     });
 
     return [rainForecastStartTime, rainForecastEndTime];

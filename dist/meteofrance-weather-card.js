@@ -20,7 +20,7 @@ const weatherIconsDay = {
   "sunny": "day",
   "windy": "windy",
   "windy-variant": "windy",
-  "exceptional": "!!",
+  "exceptional": "exceptional",
 };
 
 const DefaultSensors = [
